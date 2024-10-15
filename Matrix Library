@@ -1,0 +1,241 @@
+# matrix routines for Python programs on a Raspberry Pi Pico
+# Written by Jacob Glower
+# Date: 10/15/2024
+# Uses LCD library for the ST7796S (also on this site)
+# Documentation located on Bison Academy
+# https://www.bisonacademy.com/ECE476/Index.htm
+
+import random
+import LCD
+
+# Matrix functions for MicroPython
+
+def Help():
+    print('Matrix functions for MicroPyton')
+    print('rev 6/30/24  JSG')
+    print(' ')
+    print('A = zeros(n,m)            create an nxm matrix of zeros')
+    print('N = size(A)               return a 2x2 vector of [rows, columns]')
+    print('I = eye(n,m)              create an identity matrix that is nxm')
+    print('A = rand(n,m)             create an nxm matrix of random numbers')
+    print('B = transpose(A)          transpose A')
+    print('C = add(A,B)              C = A + B')
+    print('C = mult(A,B)             matrix multiply C = A*B')
+    print('B = mult_k(A,k)           scalar multiply B = k*A')
+    print('B = inv(A)                matrix inverse')
+    print('C = conv(A, B)            C = convolution A**B')
+    print('k = linspace(x0, dx, x1)  create a vector that goes from x0 to x1 with spacing dx')
+    print('w = logspace(e0, e1, n)   create a vector going from 10**e0 to 10**e1 with n points')
+    print('A = uniform(a, b, k)      create a vector with a uniform distibution (a,b) over vector k')
+    print('A = exp(p, k)             create a vector with a discrete exponential distibution')
+    print('                              with probability p over vector k')
+    print('C = conv(A, B)            convolve C = A**B')
+    print('display(A)                display matrix A with fixed decimal format')
+    print('display([A])              display vector A with fixed decimal format')
+    print('Bar(X)                    display X as a bar chart')
+    print('Title(msg,c1,c0)          place a title on a graph')
+    
+
+
+
+def zeros(a,b):
+    A = []
+    for i in range(0,a):
+        A.append([0]*b)
+    return(A)
+
+def ones(a,b):
+    A = []
+    for i in range(0,a):
+        A.append([1]*b)
+    return(A)
+      
+def size(A):
+    a = len(A)
+    b = len(A[0])
+    return([a,b])
+
+def power(A, b):
+    N = size(A)
+    B = zeros(N[0],N[1])
+    for i in range(0,N[0]):
+        for j in range(0,N[1]):
+            B[i][j] = A[i][j] ** b
+    return(B)
+
+def append(A, B):
+    Na = size(A)
+    Nb = size(B)
+    C = zeros(Na[0],Na[1]+Nb[1])
+    for i in range(0,Na[0]):
+        for j in range(0,Na[1]):
+            C[i][j] = A[i][j]
+        for j in range(0,Nb[1]):
+            C[i][j+Na[1]] = B[i][j]
+    return(C)
+
+def eye(a,b):
+    I = zeros(a,b)
+    for i in range(0,a):
+        if(i < b):
+           I[i][i] = 1
+    return(I)       
+
+def rand(a,b):
+    A = zeros(a,b)
+    for i in range(0,a):
+        for j in range(0,b):
+            A[i][j] = random.random()
+    return(A)
+    
+def add(A, B):
+    Sa = size(A)
+    Sb = size(B)
+    C = zeros(Sa[0], Sa[1])
+    if( (Sa[0] != Sb[0]) ):
+        print('Size Error')
+        return
+    if( (Sa[1] != Sb[1]) ):
+        print('Size Error')
+        return
+    for i in range(0, Sa[0]):
+        for j in range(0, Sa[1]):
+            C[i][j] = A[i][j] + B[i][j]
+    return(C)
+
+def transpose(A):
+    Sa = size(A)
+    B = zeros(Sa[1],Sa[0])
+    for i in range(0,Sa[0]):
+        for j in range(0,Sa[1]):
+            B[j][i] = A[i][j]
+    return(B)
+
+def mult(A, B):
+    Sa = size(A)
+    Sb = size(B)    
+    if(Sa[1] != Sb[0]):
+        print('Size Error')
+        return
+    C = zeros(Sa[0],Sb[1])
+    for i in range(0,Sa[0]):
+        for j in range(0,Sb[1]):
+            for k in range(0,Sa[1]):
+                C[i][j] += A[i][k]*B[k][j]
+    return(C)
+
+def mult_k(A,k):
+    Sa = size(A)
+    B = zeros(Sa[0],Sa[1])
+    for i in range(0,Sa[0]):
+        for j in range(0,Sa[1]):
+            B[i][j] = k*A[i][j]
+    return(B)
+
+def inv(X):
+    Sa = size(X)
+    A = mult_k(X,1)
+    n = Sa[0]
+    if(Sa[0] != Sa[1]):
+        print('Matrix must be NxN')
+        return
+    Ai = eye(n,n)
+    for i in range(0,n):
+        if(A[i][i] == 0):
+            j = i+1
+            while(A[i][i] == 0):
+                if(A[j][i] != 0):
+                    for k in range(0,n):
+                        A[i][k] += A[j][k]
+                        Ai[i][k] += Ai[i][k]
+                else:
+                    j += 1
+                if(j >= n):
+                    print('Matrix Not Invertable')
+                    return
+        scale = A[i][i]
+        for j in range(0, n):
+            A[i][j] = A[i][j] / scale
+            Ai[i][j] = Ai[i][j] / scale
+        for j in range(i+1,n):
+            scale = A[j][i]
+            for k in range(0,n):
+                A[j][k] -= A[i][k]*scale
+                Ai[j][k] -= Ai[i][k]*scale
+    for i in range(0,n-1):
+        row0 = n-i-1
+        for j in range(i+1,n):
+            row1 = n-j-1
+            scale = A[row1][row0]
+            for k in range(0,n):
+                A[row1][k] -= scale*A[row0][k]
+                Ai[row1][k] -= scale*Ai[row0][k]
+    return(Ai)        
+
+def linspace(x0, dx, x1):
+    x = x0
+    A = []
+    while(x <= x1):
+        A.append(x)
+        x += dx
+    return(A)
+
+def logspace(a,b,n):
+    x0 = 10**a
+    x1 = 10**b
+    k = 10**( (b-a)/(n-1) )
+    x = x0
+    A = [x]
+    for i in range(0,n-1):
+        x *= k
+        A.append(x)
+    return(A)
+
+def uniform(a, b, k):
+    A = []
+    for i in range(0,len(k)):
+        if( (k[i] >= a) & (k[i] <= b) ):
+            A.append(1)
+        else:
+            A.append(0)
+    dk = k[2] - k[1]        
+    scale = 1 / (sum(A) * dk)
+    for i in range(0,len(k)):
+        A[i] *= scale
+    return(A)
+
+def exp(p, k):
+    A = []
+    for i in range(0,len(k)):
+        if( k[i] > 0):
+            A.append(p * (1-p)**(k[i]-1) )
+        else:
+            A.append(0)
+    return(A)
+
+
+def conv(A, B):
+    nA = len(A)
+    nB = len(B)
+    nC = nA + nB - 1
+    C = []
+    for i in range(0,nC):
+        C.append(0)
+    for n in range(0,nC):
+        for k in range(0,nA):
+            if( ( (n-k) >= 0) & ( (n-k) < nB ) & (k < nA) ):
+                C[n] += A[k]*B[n-k]
+    return(C)
+
+def display(A):
+    nA = len(A)
+    nB = len(A[0])
+    for i in range(0,nA):
+        msg = ''
+        for j in range(0,nB):
+            x = '{: 10.3f}'.format(A[i][j])
+            msg += x
+        print(msg)
+ 
+
+   
